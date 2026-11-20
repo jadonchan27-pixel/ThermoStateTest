@@ -33,7 +33,7 @@ Run the tests with `python -m pytest`.
 | `thermo_state/state.py` | State of water at (p₁, T₁) | |
 | `thermo_state/curves.py` | Isotherm and isobar | |
 | `thermo_state/plotting.py` | The two plots | |
-| `data/` | Saturated water table as CSV (Moran, Tables A-2/A-3) | |
+| `data/` | Water tables as CSV (Moran, Tables A-2/A-3 saturated, A-4 superheated) | |
 | `tests/` | Automated checks | |
 
 Run everything from this folder (the one with `main.py`): the CSV paths are relative to it.
@@ -41,7 +41,7 @@ Run everything from this folder (the one with `main.py`): the CSV paths are rela
 ### Methods (all from ME 318M lectures)
 - **Table look-ups:** linear interpolation (Week 2)
 - **Vapor dome:** piecewise least-squares quadratic fits of ln(v) (Weeks 9–10), with a quadratic "cap" at the critical point
-- **Superheated vapor:** ideal-gas estimate starting from vg, `v = vg(P) · T_abs / Tsat_abs(P)`
+- **Superheated vapor:** Table A-4, double interpolation (in T inside each pressure block, then in P using P·v). Ideal-gas extension only outside the table: below 0.06 bar, or hotter than a block's last row
 - **Compressed liquid:** `v ≈ vf(T)`
 - **Plots:** `plt.subplot` + semilog-x axes (Week 5)
 
@@ -50,6 +50,12 @@ Run everything from this folder (the one with `main.py`): the CSV paths are rela
 Everything is in SI units: T in °C, P in bar, v in m³/kg.
 `data/sat_water_SI.csv` holds the temperature table (A-2) and the pressure table (A-3);
 the `table` column says which one a row is from.
+`data/superheated_water_SI.csv` is Table A-4 (superheated water vapor), one row per (P, T):
+24 pressure blocks from 0.06 to 320 bar. Rows with `saturated = 1` are the book's "Sat." rows
+(T = Tsat). Only `v` is used by the program; `u`, `h`, `s` are kept for reference. (The book's
+h at 180 bar, 520 °C is printed as 3378.0 but u + Pv gives 3328.1, so it is probably a typo; it is
+kept as printed.)
+
 `vf` in the SI file is in m³/kg (the book prints vf × 10³). Values are as printed in
 the book.
 

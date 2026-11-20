@@ -69,7 +69,42 @@ def load_table():
     table["P_crit"] = P_press[-1]
     table["v_crit"] = vf_press[-1]
 
+    # ---- 5. Superheated vapor table (Table A-4), from its own CSV ----
+    table["superheated"] = load_superheated()
+
     return table
+
+
+def load_superheated():
+    """Read Table A-4 (superheated water vapor) into a list of "blocks".
+
+    The book prints A-4 as one block per pressure (0.06 bar, 0.35 bar, ...,
+    320 bar). Each block lists T and v from saturation upward. The CSV keeps
+    that order: sorted by pressure, then by temperature. The first row of
+    each block below the critical pressure is the "Sat." row (T = Tsat).
+
+    Returns a list like:
+        [ {"P": 0.06, "T": array([36.16, 80, ...]), "v": array([23.739, 27.132, ...])},
+          {"P": 0.35, "T": ..., "v": ...},
+          ... ]
+    """
+    df = pd.read_csv("data/superheated_water_SI.csv")
+
+    blocks = []
+    for i in range(len(df)):
+        P = df["P_bar"][i]
+        # A new pressure means a new block
+        if len(blocks) == 0 or P != blocks[-1]["P"]:
+            blocks.append({"P": P, "T": [], "v": []})
+        blocks[-1]["T"].append(df["T_C"][i])
+        blocks[-1]["v"].append(df["v_m3_per_kg"][i])
+
+    # Lists -> NumPy arrays
+    for block in blocks:
+        block["T"] = np.array(block["T"])
+        block["v"] = np.array(block["v"])
+
+    return blocks
 
 
 def linear_interpolation(x, x_data, y_data):
@@ -140,18 +175,87 @@ def vg_at_T(table, T):
     return linear_interpolation(T, table["temperature"]["T"], table["temperature"]["vg"])
 
 
+def v_in_block(block, T):
+    """v at temperature T inside ONE pressure block of Table A-4."""
+    T_first = block["T"][0]
+    T_last = block["T"][-1]
+
+    if T < T_first:
+        # Can only happen by a hair (rounding between Tables A-3 and A-4):
+        # use the saturated-vapor row
+        return block["v"][0]
+    elif T <= T_last:
+        return linear_interpolation(T, block["T"], block["v"])
+    else:
+        # Hotter than the table goes: extend with the ideal gas law.
+        # At constant P, v is proportional to absolute temperature.
+        return block["v"][-1] * (T + KELVIN_OFFSET) / (T_last + KELVIN_OFFSET)
+
+
 def superheated_volume(table, P, T):
-    """Approximate v of superheated vapor at (P, T).
+    """v of superheated vapor at (P, T), from Table A-4 by double interpolation.
 
-    The saturated tables don't cover superheated vapor, so we start from
-    vg at this pressure and treat the vapor as an ideal gas (Pv = RT).
-    At constant P, v is proportional to absolute temperature:
+    1. Find the two A-4 pressure blocks around P (e.g. P = 50 bar -> 40 and 60 bar).
+    2. In each block, interpolate in T to get v at T.
+    3. Interpolate between the two blocks in P.
+    (Steps 2 and 3 are in double_interpolation below.)
 
-        v = vg(P) * T_abs / Tsat_abs(P)
+    Step 3 interpolates P*v instead of v. v is roughly proportional to 1/P
+    (ideal gas), so it curves a lot between pressures, but P*v is almost
+    constant, so a straight line between the two blocks is very accurate.
+    (Same idea as the Week 10 fits: transform first so the data is close
+    to a straight line.) Example at 200 °C between 0.06 and 0.35 bar:
+    interpolating v directly gives 21.8 m³/kg at 0.2 bar, but P*v gives
+    10.9 m³/kg, which is the right answer.
 
-    Check against the Week 2 slide table (1.5 bar, 200 °C):
-        1.159 * (200 + 273.15) / (111.37 + 273.15) = 1.426 m³/kg   (table: 1.444)
+    Check (50 bar, 500 °C):
+        40 bar: P*v = 40 * 0.08643 = 3.457      60 bar: P*v = 60 * 0.05665 = 3.399
+        50 bar: P*v = 3.428  ->  v = 3.428 / 50 = 0.06856 m³/kg
     """
-    T_abs = T + KELVIN_OFFSET
-    Tsat_abs = Tsat(table, P) + KELVIN_OFFSET
-    return vg_at_P(table, P) * T_abs / Tsat_abs
+    blocks = table["superheated"]
+
+    # Below the lowest A-4 pressure (0.06 bar), steam is an ideal gas almost
+    # exactly, so start from vg and scale by absolute temperature.
+    if P < blocks[0]["P"]:
+        T_abs = T + KELVIN_OFFSET
+        Tsat_abs = Tsat(table, P) + KELVIN_OFFSET
+        return vg_at_P(table, P) * T_abs / Tsat_abs
+
+    # 1. Find the blocks just below and just above P
+    #    (P exactly on a block, like 200 bar, uses that block as "low")
+    low = blocks[0]
+    high = blocks[1]
+    for i in range(len(blocks) - 1):
+        if P >= blocks[i]["P"] and P < blocks[i + 1]["P"]:
+            low = blocks[i]
+            high = blocks[i + 1]
+            break
+
+    T_start = high["T"][0]     # first temperature the higher block has
+
+    if T >= T_start:
+        # Both blocks have data at T: normal double interpolation
+        return double_interpolation(low, high, P, T)
+    else:
+        # Just above the dome. The higher-pressure block has no rows this
+        # cold (it would be liquid there). So interpolate in T between:
+        #   - the saturated vapor at P:  (Tsat(P), vg(P))  from Table A-3
+        #   - the first T both blocks have:  (T_start, v at T_start)
+        T_s = Tsat(table, P)
+        v_s = vg_at_P(table, P)
+        if T <= T_s:
+            return v_s
+        v_start = double_interpolation(low, high, P, T_start)
+        return linear_interpolation(T, [T_s, T_start], [v_s, v_start])
+
+
+def double_interpolation(low, high, P, T):
+    """v at (P, T) from two neighboring A-4 blocks (low P and high P).
+
+    2. Interpolate in T inside each block.
+    3. Interpolate between the blocks in P, using P*v (see superheated_volume).
+    """
+    Pv_low = low["P"] * v_in_block(low, T)
+    Pv_high = high["P"] * v_in_block(high, T)
+    Pv = linear_interpolation(P, [low["P"], high["P"]], [Pv_low, Pv_high])
+    return Pv / P

@@ -57,10 +57,30 @@ def test_tsat_below_pressure_table():
     assert Tsat(table, 0.02339) == pytest.approx(20, abs=0.1)
 
 
-def test_superheated_matches_week2_table():
-    # Week 2 slide: 1.5 bar, 200 °C -> v = 1.444 m³/kg (ideal-gas estimate within 2%)
+def test_superheated_table_row():
+    # Exactly on a Table A-4 row: 1.5 bar, 200 °C -> 1.444 m³/kg
     table = load_table()
-    assert superheated_volume(table, 1.5, 200) == pytest.approx(1.444, rel=0.02)
+    assert superheated_volume(table, 1.5, 200) == pytest.approx(1.444, abs=0.0005)
+
+
+def test_superheated_between_pressures():
+    # 50 bar, 500 °C is between the 40 and 60 bar blocks (real value 0.06857)
+    table = load_table()
+    assert superheated_volume(table, 50, 500) == pytest.approx(0.06857, rel=0.005)
+
+
+def test_superheated_matches_vg_at_dome():
+    # On the dome, superheated v should equal vg (10 bar: Tsat 179.91 °C, vg 0.1944)
+    table = load_table()
+    assert superheated_volume(table, 10, 179.91) == pytest.approx(0.1944, rel=0.005)
+
+
+def test_superheated_table_loaded():
+    table = load_table()
+    blocks = table["superheated"]
+    assert len(blocks) == 24                  # 0.06 bar ... 320 bar
+    assert blocks[0]["P"] == pytest.approx(0.06)
+    assert blocks[-1]["P"] == pytest.approx(320)
 
 
 # ---------- fitting ----------
