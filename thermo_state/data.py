@@ -12,36 +12,17 @@ import numpy as np
 import pandas as pd
 
 
-def load_table(units):
-    """Read the CSV for the chosen units and return everything in one dictionary.
+# Kelvin = °C + 273.15 (absolute temperature, used in the ideal-gas estimate)
+KELVIN_OFFSET = 273.15
 
-    units: "SI" or "English"
+
+def load_table():
+    """Read the SI saturated-water CSV and return everything in one dictionary.
+
+    Units everywhere: T in °C, P in bar, v in m³/kg.
     """
-    # ---- 1. Pick the file and the column names for the chosen units ----
-    if units == "SI":
-        df = pd.read_csv("data/sat_water_SI.csv")
-        T_col = "T_C"
-        P_col = "P_bar"
-        vf_col = "vf_m3_per_kg"
-        vg_col = "vg_m3_per_kg"
-        temp_table_name = "A-2"
-        press_table_name = "A-3"
-        T_offset = 273.15          # °C -> K   (absolute temperature)
-        T_label = "°C"
-        P_label = "bar"
-        v_label = "m³/kg"
-    else:
-        df = pd.read_csv("data/sat_water_English.csv")
-        T_col = "T_F"
-        P_col = "P_psia"
-        vf_col = "vf_ft3_per_lb"
-        vg_col = "vg_ft3_per_lb"
-        temp_table_name = "A-2E"
-        press_table_name = "A-3E"
-        T_offset = 459.67          # °F -> °R  (absolute temperature)
-        T_label = "°F"
-        P_label = "psia"
-        v_label = "ft³/lb"
+    # ---- 1. Read the file ----
+    df = pd.read_csv("data/sat_water_SI.csv")
 
     # ---- 2. Split the rows into the temperature table and the pressure table ----
     # Each row's "table" column says which book table it came from.
@@ -56,31 +37,26 @@ def load_table(units):
     vg_press = []
 
     for i in range(len(df)):
-        if df["table"][i] == temp_table_name:
-            T_temp.append(df[T_col][i])
-            P_temp.append(df[P_col][i])
-            vf_temp.append(df[vf_col][i])
-            vg_temp.append(df[vg_col][i])
-        elif df["table"][i] == press_table_name:
-            T_press.append(df[T_col][i])
-            P_press.append(df[P_col][i])
-            vf_press.append(df[vf_col][i])
-            vg_press.append(df[vg_col][i])
+        if df["table"][i] == "A-2":            # temperature table
+            T_temp.append(df["T_C"][i])
+            P_temp.append(df["P_bar"][i])
+            vf_temp.append(df["vf_m3_per_kg"][i])
+            vg_temp.append(df["vg_m3_per_kg"][i])
+        elif df["table"][i] == "A-3":          # pressure table
+            T_press.append(df["T_C"][i])
+            P_press.append(df["P_bar"][i])
+            vf_press.append(df["vf_m3_per_kg"][i])
+            vg_press.append(df["vg_m3_per_kg"][i])
 
     # ---- 3. Put everything in one dictionary (lists -> NumPy arrays) ----
     table = {
-        "units": units,
-        "T_label": T_label,
-        "P_label": P_label,
-        "v_label": v_label,
-        "T_offset": T_offset,
-        "temperature": {          # Table A-2 / A-2E (rows listed by T)
+        "temperature": {          # Table A-2 (rows listed by T)
             "T": np.array(T_temp),
             "P": np.array(P_temp),
             "vf": np.array(vf_temp),
             "vg": np.array(vg_temp),
         },
-        "pressure": {             # Table A-3 / A-3E (rows listed by P)
+        "pressure": {             # Table A-3 (rows listed by P)
             "T": np.array(T_press),
             "P": np.array(P_press),
             "vf": np.array(vf_press),
@@ -125,8 +101,8 @@ def lookup_by_P(table, P, column):
     """Interpolate a column ("T", "vf" or "vg") at pressure P.
 
     Uses the pressure table when P is inside it. Below its first row
-    (0.04 bar / 0.4 psia) it falls back to the temperature table, whose
-    pressures go lower (down to 0.00611 bar / 0.0886 psia at the triple point).
+    (0.04 bar) it falls back to the temperature table, whose pressures go
+    lower (down to 0.00611 bar at the triple point).
     """
     if P >= table["pressure"]["P"][0]:
         return linear_interpolation(P, table["pressure"]["P"], table["pressure"][column])
@@ -176,6 +152,6 @@ def superheated_volume(table, P, T):
     Check against the Week 2 slide table (1.5 bar, 200 °C):
         1.159 * (200 + 273.15) / (111.37 + 273.15) = 1.426 m³/kg   (table: 1.444)
     """
-    T_abs = T + table["T_offset"]
-    Tsat_abs = Tsat(table, P) + table["T_offset"]
+    T_abs = T + KELVIN_OFFSET
+    Tsat_abs = Tsat(table, P) + KELVIN_OFFSET
     return vg_at_P(table, P) * T_abs / Tsat_abs

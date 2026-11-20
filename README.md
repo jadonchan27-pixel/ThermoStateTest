@@ -33,7 +33,7 @@ Run the tests with `python -m pytest`.
 | `thermo_state/state.py` | State of water at (p₁, T₁) | |
 | `thermo_state/curves.py` | Isotherm and isobar | |
 | `thermo_state/plotting.py` | The two plots | |
-| `data/` | Saturated water tables as CSV (Moran, Tables A-2/A-3 and A-2E/A-3E) | |
+| `data/` | Saturated water table as CSV (Moran, Tables A-2/A-3) | |
 | `tests/` | Automated checks | |
 
 Run everything from this folder (the one with `main.py`): the CSV paths are relative to it.
@@ -47,8 +47,9 @@ Run everything from this folder (the one with `main.py`): the CSV paths are rela
 
 ## Data
 
-`data/sat_water_SI.csv` and `data/sat_water_English.csv` each hold the temperature
-table and the pressure table; the `table` column says which one a row is from.
+Everything is in SI units: T in °C, P in bar, v in m³/kg.
+`data/sat_water_SI.csv` holds the temperature table (A-2) and the pressure table (A-3);
+the `table` column says which one a row is from.
 `vf` in the SI file is in m³/kg (the book prints vf × 10³). Values are as printed in
 the book.
 

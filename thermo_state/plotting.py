@@ -31,14 +31,14 @@ def plot_pv(table, P1, T1, v1, state_name):
 
     # 3. Isotherm for T1
     v_iso, P_iso = isotherm_pv(table, T1)
-    plt.semilogx(v_iso, P_iso, 'm-', label=f'Isotherm T1 = {T1} {table["T_label"]}')
+    plt.semilogx(v_iso, P_iso, 'm-', label=f'Isotherm T1 = {T1} °C')
 
     # 4. The point (P1, T1)
     plt.semilogx(v1, P1, 'mo', markersize=9, label='(P1, T1)')
 
     # 5. Labels, state of water, legend
-    plt.xlabel(f'Specific volume v [{table["v_label"]}]')
-    plt.ylabel(f'Pressure P [{table["P_label"]}]')
+    plt.xlabel('Specific volume v [m³/kg]')
+    plt.ylabel('Pressure P [bar]')
     plt.title(f'p-v diagram:  {state_name}')
     plt.legend()
     plt.grid(True)
@@ -64,14 +64,14 @@ def plot_tv(table, P1, T1, v1, state_name):
     else:
         T_top = 1.15 * table["T_crit"]
     v_bar, T_bar = isobar_tv(table, P1, T_top)
-    plt.semilogx(v_bar, T_bar, 'm-', label=f'Isobar P1 = {P1} {table["P_label"]}')
+    plt.semilogx(v_bar, T_bar, 'm-', label=f'Isobar P1 = {P1} bar')
 
     # 4. The point (P1, T1)
     plt.semilogx(v1, T1, 'mo', markersize=9, label='(P1, T1)')
 
     # 5. Labels, state of water, legend
-    plt.xlabel(f'Specific volume v [{table["v_label"]}]')
-    plt.ylabel(f'Temperature T [{table["T_label"]}]')
+    plt.xlabel('Specific volume v [m³/kg]')
+    plt.ylabel('Temperature T [°C]')
     plt.title(f'T-v diagram:  {state_name}')
     plt.legend()
     plt.grid(True)

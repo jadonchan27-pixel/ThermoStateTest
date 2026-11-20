@@ -10,7 +10,7 @@ COMPRESSED = "COMPRESSED LIQUID"
 SATURATED = "SAT. LIQUID-VAPOR"
 SUPERHEATED = "SUPERHEATED VAPOR"
 
-# How close T1 must be to Tsat to count as "saturated" (in °C or °F).
+# How close T1 must be to Tsat to count as "saturated" (°C).
 # Exact equality almost never happens with decimals, so we use a tolerance.
 TOLERANCE = 0.1
 
